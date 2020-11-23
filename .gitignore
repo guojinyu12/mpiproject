@@ -1,0 +1,5 @@
+1Makefile
+tags
+*.o
+matrix
+.other/*
