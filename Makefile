@@ -2,9 +2,10 @@ CFLAGS=-Wall -fopenmp
 CC=gcc
 LDFLAGS=-fPIC -Wl,-z,noexecstack -I/usr/local/include -L/usr/local/lib -Wl,-rpath,/usr/local/lib
 source=$(wildcard *.c)
+obj=$(source:.o=.c)
 target=matrix
 example=$(basename $(source))
-$(target):main.o matric1.o
+$(target):$(obj)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lmpi -lm
 main.o:matrix.h
 .PHONY: clean
