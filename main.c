@@ -21,7 +21,6 @@ int main(int argc, char* argv[]){
 		int rank;//MPI进程序号
 		int dims[DIMENSION] = {DIMENSION_SIZE, DIMENSION_SIZE};//每个维度的元素数
 		int periods[DIMENSION] = {1, 1};//循环
-		int coords[2] = {0, 0};//坐标
 		
 		double *a= NULL, *b = NULL, *c = NULL;//矩阵
 		int matrix_size[4];// 两个矩阵行列数
@@ -50,47 +49,20 @@ int main(int argc, char* argv[]){
 			//矩阵数据的获取完毕}}}
 			//矩阵分块{{{
 			int* block1 = malloc(size*sizeof(int));
-			int local_size[2];
+			//矩阵A生成映射关系并分块
 			matrix_group(&block1, block_num, block_num);
-			/* for(int i = 0; i < size; i++){ */
-			/* 	printf("%d,", block1[i]); */
-			/* } */
-			/* printf("\n"); */
 			matrix_split(&a, &matrix_size[0], block1, block_num);
+			//矩阵B生成映射关系并分块
 			matrix_group2(&block1, block_num, block_num);
-			/* for(int i = 0; i < size; i++){ */
-			/* 	printf("%d,", block1[i]); */
-			/* } */
-			/* printf("\n"); */
 			matrix_split(&b, &matrix_size[2], block1, block_num);
 			free(block1);
 			block1 = NULL;
 			//矩阵分块结束}}}
-			//矩阵显示
-			/* int x = block(matrix_size[0], block_num), y = block(matrix_size[1], block_num); */
-			/* for(int i = 0; i < size; i++){ */
-			/* 	local_size[0] = (int)a[(x * y + 2) * i]; */
-			/* 	local_size[1] = (int)a[(x * y + 2) * i + 1]; */
-			/* 	print_matrix(stdout, &a[(x * y + 2) * i + 2], local_size); */
-			/* 	printf("\n"); */
-			/* } */
-			/* x = block(matrix_size[2], block_num), y = block(matrix_size[3], block_num); */
-			/* for(int i = 0; i < size; i++){ */
-			/* 	local_size[0] = (int)b[(x * y + 2) * i]; */
-			/* 	local_size[1] = (int)b[(x * y + 2) * i + 1]; */
-			/* 	print_matrix(stdout, &b[(x * y + 2) * i + 2], local_size); */
-			/* 	printf("\n"); */
-			/* } */
-
-			c = (double*)calloc(matrix_size[0] * matrix_size[3], sizeof(double));
-
-
 		}//进程 0 独有动作结束
-		else{
-		}
 
 		//广播矩阵的行标和列标
 		MPI_Bcast(matrix_size, 4, MPI_INT, 0, cartcomm);
+		//计算矩阵所需最少空间{{{
 		int local_matrix_size[4] = {// 矩阵块的最大行列数
 			block(matrix_size[0], block_num), 
 			block(matrix_size[1], block_num), 
@@ -105,15 +77,27 @@ int main(int argc, char* argv[]){
 		double *local_a = malloc(local_length[0] * sizeof(double));
 		double *local_b = malloc(local_length[1] * sizeof(double));
 		double *local_c = calloc(local_length[2], sizeof(double));
+		// 本地内存准备结束}}}
 		// 分发数据
 		MPI_Scatter(a, local_length[0], MPI_DOUBLE, local_a, local_length[0], MPI_DOUBLE, 0, cartcomm);
 		MPI_Scatter(b, local_length[1], MPI_DOUBLE, local_b, local_length[1], MPI_DOUBLE, 0, cartcomm);
-		
-		local_matrix_size[0] = (int)local_a[0];
-		local_matrix_size[1] = (int)local_a[1];
-		local_matrix_size[2] = (int)local_b[0];
-		local_matrix_size[3] = (int)local_b[1];
-		matrix1(local_a + 2, local_b + 2, local_c + 2, local_matrix_size); 
+
+		//提前释放内存，节约空间
+		if(rank == 0){
+			if(a != NULL) {
+				free(a);
+				a = NULL;
+			}
+			if(b != NULL){
+				free(b);
+				b = NULL;
+			}
+		}
+		// 计算并在进程间传输{{{
+		// 矩阵块C的大小
+		local_c[0] = local_a[0];
+		local_c[1] = local_b[1];
+		matrix_multiplus(local_a, local_b, local_c);
 		// 两个维度上的邻居编号
 		int neighbors[4];//保存邻居
 		MPI_Cart_shift(cartcomm, 0, 1, &neighbors[UP], &neighbors[DOWN]);
@@ -121,32 +105,30 @@ int main(int argc, char* argv[]){
 		MPI_Request request[4];// 请求对象
 		MPI_Status status[4];// 状态对象
 		// 从右和下接收，向左和上发送
-		printf("rank = %d  neighbors = %d,%d,%d,%d \n", rank,
-				 neighbors[0], neighbors[1], neighbors[2], neighbors[3]);
-		print_matrix(stdout, local_c + 2, local_matrix_size); 
 		for(int i = block_num - 1; i > 0; i--){
 			MPI_Isend(local_b, local_length[1], MPI_DOUBLE, neighbors[DOWN], 1, cartcomm, &request[DOWN]);
 			MPI_Irecv(local_b, local_length[1], MPI_DOUBLE, neighbors[UP], 1, cartcomm, &request[UP]);
 			MPI_Isend(local_a, local_length[0], MPI_DOUBLE, neighbors[RIGHT], 1, cartcomm, &request[RIGHT]);
 			MPI_Irecv(local_a, local_length[0], MPI_DOUBLE, neighbors[LEFT], 1, cartcomm, &request[LEFT]);
 			MPI_Waitall(4, request, status);// 等待接收完成
-			local_matrix_size[0] = (int)local_a[0];
-			local_matrix_size[1] = (int)local_a[1];
-			local_matrix_size[2] = (int)local_b[0];
-			local_matrix_size[3] = (int)local_b[1];
-			matrix1(local_a + 2, local_b + 2, local_c + 2, local_matrix_size); 
-			local_c[0] = local_a[0];
-			local_c[1] = local_b[1];
+			matrix_multiplus(local_a, local_b, local_c);
 		}
-
-		// 结果
-		printf("rank = %d  neighbors = %d,%d,%d,%d ", rank,
-				 neighbors[0], neighbors[1], neighbors[2], neighbors[3]);
-		printf("matrix_size = ((%d * %d), (%d, %d))\n", 
-				matrix_size[0], matrix_size[1], matrix_size[2], matrix_size[3]);
-		print_matrix(stdout, local_c + 2, local_matrix_size); 
-		local_matrix_size[0] = (int)local_c[0];
-		local_matrix_size[1] = (int)local_c[1];
+		// 所有运算部分结束}}}
+		// 数据的回收
+		if(rank == 0){
+			c =  malloc(size * local_length[2] * sizeof(double));
+		}
+		MPI_Gather(local_c, local_length[2], MPI_DOUBLE, c, local_length[2], MPI_DOUBLE, 0, cartcomm);
+		// 转换与结果显示
+		if(rank == 0){
+			int* block1 = malloc(size * sizeof(int));
+			for(int i = 0; i < size; i++){
+				block1[i] = i;
+			}
+			matrix_size[1] = matrix_size[3];
+			matrix_merge(&c, matrix_size, block1, block_num);
+			print_matrix(c, matrix_size);
+		}
 		// {{{ 释放内存
 		if(a != NULL) {
 			free(a);
