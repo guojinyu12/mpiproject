@@ -107,11 +107,6 @@ int main(int argc, char* argv[]){
 		for(int i = block_num - 1; i > 0; i--){
 			MPI_Sendrecv_replace(local_a, local_length[0], MPI_DOUBLE, neighbors[RIGHT], 1, neighbors[LEFT], 1, cartcomm, &status[1]);
 			MPI_Sendrecv_replace(local_b, local_length[1], MPI_DOUBLE, neighbors[DOWN], 1, neighbors[UP], 1, cartcomm, &status[0]);
-			// MPI_Isend(local_b, local_length[1], MPI_DOUBLE, neighbors[DOWN], 1, cartcomm, &request[DOWN]);
-			// MPI_Irecv(local_b, local_length[1], MPI_DOUBLE, neighbors[UP], 1, cartcomm, &request[UP]);
-			// MPI_Isend(local_a, local_length[0], MPI_DOUBLE, neighbors[RIGHT], 1, cartcomm, &request[RIGHT]);
-			// MPI_Irecv(local_a, local_length[0], MPI_DOUBLE, neighbors[LEFT], 1, cartcomm, &request[LEFT]);
-			// MPI_Waitall(4, request, status);// 等待接收完成
 			matrix_multiplus(local_a, local_b, local_c);
 		}
 		// 所有运算部分结束}}}
