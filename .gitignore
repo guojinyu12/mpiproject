@@ -1,6 +1,6 @@
-1Makefile
 Makefile
 tags
 *.o
 matrix
+series
 .other/*

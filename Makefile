@@ -13,4 +13,4 @@ series: series.o matrix1.o
 	$(CC) $(CFLAGS) -o $@ $^
 .PHONY: clean all
 clean:
-	$(RM) *.o $(target)
+	$(RM) *.o $(target) series
