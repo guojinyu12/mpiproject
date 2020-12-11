@@ -16,10 +16,10 @@ int main(int argc, char* argv[]){
 	int size;//进程数
 	MPI_Init(&argc, &argv);//MPI环境
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
-	if(size == 4){
-		int block_num = (int)sqrt(size);
+	if(size == 4 || size == 9 || size == 16){
 		int rank;//MPI进程序号
-		int dims[DIMENSION] = {DIMENSION_SIZE, DIMENSION_SIZE};//每个维度的元素数
+		int block_num = (int)sqrt(size);
+		int dims[DIMENSION] = {block_num, block_num};//每个维度的元素数
 		int periods[DIMENSION] = {1, 1};//循环
 		
 		double *a= NULL, *b = NULL, *c = NULL;//矩阵
@@ -76,12 +76,11 @@ int main(int argc, char* argv[]){
 		};
 		double *local_a = malloc(local_length[0] * sizeof(double));
 		double *local_b = malloc(local_length[1] * sizeof(double));
-		double *local_c = calloc(local_length[2], sizeof(double));
+		double *local_c = calloc(local_length[2], sizeof(double)); //保证初始化为0
 		// 本地内存准备结束}}}
 		// 分发数据
 		MPI_Scatter(a, local_length[0], MPI_DOUBLE, local_a, local_length[0], MPI_DOUBLE, 0, cartcomm);
 		MPI_Scatter(b, local_length[1], MPI_DOUBLE, local_b, local_length[1], MPI_DOUBLE, 0, cartcomm);
-
 		//提前释放内存，节约空间
 		if(rank == 0){
 			if(a != NULL) {
@@ -106,11 +105,13 @@ int main(int argc, char* argv[]){
 		MPI_Status status[4];// 状态对象
 		// 从右和下接收，向左和上发送
 		for(int i = block_num - 1; i > 0; i--){
-			MPI_Isend(local_b, local_length[1], MPI_DOUBLE, neighbors[DOWN], 1, cartcomm, &request[DOWN]);
-			MPI_Irecv(local_b, local_length[1], MPI_DOUBLE, neighbors[UP], 1, cartcomm, &request[UP]);
-			MPI_Isend(local_a, local_length[0], MPI_DOUBLE, neighbors[RIGHT], 1, cartcomm, &request[RIGHT]);
-			MPI_Irecv(local_a, local_length[0], MPI_DOUBLE, neighbors[LEFT], 1, cartcomm, &request[LEFT]);
-			MPI_Waitall(4, request, status);// 等待接收完成
+			MPI_Sendrecv_replace(local_a, local_length[0], MPI_DOUBLE, neighbors[RIGHT], 1, neighbors[LEFT], 1, cartcomm, &status[1]);
+			MPI_Sendrecv_replace(local_b, local_length[1], MPI_DOUBLE, neighbors[DOWN], 1, neighbors[UP], 1, cartcomm, &status[0]);
+			// MPI_Isend(local_b, local_length[1], MPI_DOUBLE, neighbors[DOWN], 1, cartcomm, &request[DOWN]);
+			// MPI_Irecv(local_b, local_length[1], MPI_DOUBLE, neighbors[UP], 1, cartcomm, &request[UP]);
+			// MPI_Isend(local_a, local_length[0], MPI_DOUBLE, neighbors[RIGHT], 1, cartcomm, &request[RIGHT]);
+			// MPI_Irecv(local_a, local_length[0], MPI_DOUBLE, neighbors[LEFT], 1, cartcomm, &request[LEFT]);
+			// MPI_Waitall(4, request, status);// 等待接收完成
 			matrix_multiplus(local_a, local_b, local_c);
 		}
 		// 所有运算部分结束}}}
@@ -126,7 +127,7 @@ int main(int argc, char* argv[]){
 				block1[i] = i;
 			}
 			matrix_size[1] = matrix_size[3];
-			matrix_merge(&c, matrix_size, block1, block_num);
+			c = matrix_merge(&c, matrix_size, block1, block_num);
 			print_matrix(c, matrix_size);
 		}
 		// {{{ 释放内存
@@ -156,7 +157,7 @@ int main(int argc, char* argv[]){
 		}// }}} 释放内存结束
 	}
 	else
-		fprintf(stderr, "there is not enough process"); 
+		fprintf(stderr, "there is not enough process\n"); 
 	MPI_Finalize();//MPI环境结束
 	return 0;
 }

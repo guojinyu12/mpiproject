@@ -9,6 +9,7 @@ extern int read_matrix(char *filename, double **matrix, int*matrix_size);
 extern int read_matrix2(FILE *pfile,  double **matrix, int*matrix_size);
 #define print_matrix(matrix, matrix_size) write_matrix(stdout, matrix, matrix_size)
 extern int write_matrix(FILE *pfile,  double *matrix, int *matrix_size);
+extern int write_matrix2(FILE* pfile,  double *matrix, int matrix_size_x, int matrix_size_y);
 //进程的笛卡尔坐标和矩阵块的映射关系
 extern int matrix_group(int** block, int column, int row);
 extern int matrix_group2(int** block, int column, int row);
