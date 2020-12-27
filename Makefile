@@ -6,10 +6,10 @@ obj=$(source:.c=.o)
 target=matrix
 example=$(basename $(source))
 all:$(target) series
-$(target):main.o matrix1.o
+$(target):main.o matrix.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lmpi -lm
 main.o:matrix.h
-series: series.o matrix1.o
+series: series.o matrix.o
 	$(CC) $(CFLAGS) -o $@ $^
 .PHONY: clean all
 clean:
