@@ -101,8 +101,7 @@ int main(int argc, char* argv[]){
 		int neighbors[4];//保存邻居
 		MPI_Cart_shift(cartcomm, 0, 1, &neighbors[UP], &neighbors[DOWN]);
 		MPI_Cart_shift(cartcomm, 1, 1, &neighbors[LEFT], &neighbors[RIGHT]);
-		MPI_Request request[4];// 请求对象
-		MPI_Status status[4];// 状态对象
+		MPI_Status status[2];// 状态对象
 		// 从右和下接收，向左和上发送
 		for(int i = block_num - 1; i > 0; i--){
 			MPI_Sendrecv_replace(local_a, local_length[0], MPI_DOUBLE, neighbors[RIGHT], 1, neighbors[LEFT], 1, cartcomm, &status[1]);
